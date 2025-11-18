@@ -17,8 +17,8 @@ The Producer-Consumer problem involves a shared, fixed-size (bounded) buffer tha
 This scenario introduces two major concurrency challenges:
 1.  **Race Condition:** If two threads (e.g., a producer and a consumer) try to access the buffer's internal pointers at the *exact same time*, the data structure can become corrupted, leading to lost or duplicated data.
 2.  **Busy-Waiting / Deadlock:**
-    * If a producer finds the buffer is **full**, it must wait (sleep) until a consumer makes space.
-    * If a consumer finds the buffer is **empty**, it must wait (sleep) until a producer adds an item.
+    * If a producer finds the buffer is **full**, it must wait (sleep) until a consumer makes space.
+    * If a consumer finds the buffer is **empty**, it must wait (sleep) until a producer adds an item.
 
 A naive solution using only a mutex will lead to inefficient busy-waiting or deadlocks.
 
@@ -29,18 +29,16 @@ This program implements an elegant, efficient solution using a combination of on
 * **`pthread_mutex_t (mutex)`:** A single mutex (lock) is used to provide **mutual exclusion**. It protects the *physical* buffer (the array and its `in`/`out` indices) during the brief moment of insertion or removal. This solves the **race condition**.
 
 * **`sem_t empty` (Counting Semaphore):** This semaphore is initialized to the buffer's `SIZE`. It tracks the number of *empty slots* available.
-    * Producers must `sem_wait(&empty)` (decrement) before they can produce.
-    * If `empty` is 0, the buffer is full, and the producer thread is automatically put to sleep by the OS.
-    * Consumers signal `sem_post(&empty)` (increment) after they consume, waking up a sleeping producer.
+    * Producers must `sem_wait(&empty)` (decrement) before they can produce.
+    * If `empty` is 0, the buffer is full, and the producer thread is automatically put to sleep by the OS.
+    * Consumers signal `sem_post(&empty)` (increment) after they consume, waking up a sleeping producer.
 
 * **`sem_t full` (Counting Semaphore):** This semaphore is initialized to `0`. It tracks the number of *items available* in the buffer.
-    * Consumers must `sem_wait(&full)` (decrement) before they can consume.
-    * If `full` is 0, the buffer is empty, and the consumer thread is automatically put to sleep.
-    * Producers signal `sem_post(&full)` (increment) after they produce, waking up a sleeping consumer.
+    * Consumers must `sem_wait(&full)` (decrement) before they can consume.
+    * If `full` is 0, the buffer is empty, and the consumer thread is automatically put to sleep.
+    * Producers signal `sem_post(&full)` (increment) after they produce, waking up a sleeping consumer.
 
-> **[Image: Diagram of Producer-Consumer with Semaphores and Mutex]**
->
-> *(**Developer Note:** A diagram showing the buffer, producer/consumer, and the `empty`, `full`, and `mutex` primitives would be perfect here.)*
+
 
 ---
 
@@ -51,48 +49,48 @@ The logic for the producer and consumer threads demonstrates this pattern:
 **Producer Thread Logic:**
 ```c
 while (true) {
-    // Produce a new item...
-    produce_item(&item);
+    // Produce a new item...
+    produce_item(&item);
 
-    // Wait for an empty slot to become available
-    sem_wait(&empty);
+    // Wait for an empty slot to become available
+    sem_wait(&empty);
 
-    // Lock the buffer to prevent race conditions
-    pthread_mutex_lock(&mutex);
-    
-    // --- CRITICAL SECTION ---
-    insert_item_into_buffer(item);
-    // --- END CRITICAL ---
+    // Lock the buffer to prevent race conditions
+    pthread_mutex_lock(&mutex);
+    
+    // --- CRITICAL SECTION ---
+    insert_item_into_buffer(item);
+    // --- END CRITICAL ---
 
-    // Unlock the buffer
-    pthread_mutex_unlock(&mutex);
-    
-    // Signal that one more slot is now full
-    sem_post(&full);
+    // Unlock the buffer
+    pthread_mutex_unlock(&mutex);
+    
+    // Signal that one more slot is now full
+    sem_post(&full);
 }
 ```
 
 **Consumer Thread Logic:**
 ```c
 while (true) {
-    // Wait for a full slot to become available
-    sem_wait(&full);
+    // Wait for a full slot to become available
+    sem_wait(&full);
 
-    // Lock the buffer to prevent race conditions
-    pthread_mutex_lock(&mutex);
+    // Lock the buffer to prevent race conditions
+    pthread_mutex_lock(&mutex);
 
-    // --- CRITICAL SECTION ---
-    remove_item_from_buffer(&item);
-    // --- END CRITICAL ---
+    // --- CRITICAL SECTION ---
+    remove_item_from_buffer(&item);
+    // --- END CRITICAL ---
 
-    // Unlock the buffer
-    pthread_mutex_unlock(&mutex);
+    // Unlock the buffer
+    pthread_mutex_unlock(&mutex);
 
-    // Signal that one more slot is now empty
-    sem_post(&empty);
+    // Signal that one more slot is now empty
+    sem_post(&empty);
 
-    // Consume the item...
-    consume_item(item);
+    // Consume the item...
+    consume_item(item);
 }
 ```
 
